@@ -2,6 +2,7 @@ library(lubridate)
 library(dplyr)
 library(magrittr)
 library(rmarkdown)
+library(rfigshare)
 source('forecast_tools.R')
 
 get_moon_data <- function(){
@@ -183,6 +184,8 @@ forecastall <- function(abundances, level, weather_data, weatherforecast,
   model_aic_file_name = paste(as.character(forecast_date), level, filename_suffix, "_model_aic.csv", sep="")
   write.csv(forecasts, file.path('predictions', forecast_file_name), row.names=FALSE)
   write.csv(all_model_aic, file.path('predictions', model_aic_file_name), row.names=FALSE)
+#  rfigshare::fs_upload(5197030, file.path('predictions', forecast_file_name))
+#  rfigshare::fs_make_public(5197030)
 
 ########Add ensembles to files############################################
   ensemble=make_ensemble(forecasts) %>% subset(select=colnames(forecasts))
