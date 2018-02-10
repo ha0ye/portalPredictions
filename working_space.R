@@ -53,6 +53,9 @@ forecast_date = as.Date(model_metadata$forecast_date)
 
     data.frame(nm, Y, foy) 
 
+nm <- nm[which(is.na(Y) == FALSE)]
+foy <- foy[which(is.na(Y) == FALSE)]
+Y <- Y[which(is.na(Y) == FALSE)]
 
 
   
