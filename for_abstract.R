@@ -78,13 +78,20 @@ par(mfrow = c(2, 1))
 plot_title <- paste(specific_species, " in plot ", specific_plot, sep = "")
 plot_title <- "total in plots 4, 11, 14, & 17 summed"
 plot(newmoon_date, Y, type = 'l', las = 1, main = plot_title)
-acf(Y, na.action = na.pass, lag.max = 100, las = 1, main = plot_title)
+acf(Y, na.action = na.pass, lag.max = 450, las = 1, main = plot_title)
+
+
+mean(c(cor(t4, t11, use = "complete.obs"),
+cor(t4, t14, use = "complete.obs"),
+cor(t4, t17, use = "complete.obs"),
+cor(t11, t14, use = "complete.obs"),
+cor(t11, t17, use = "complete.obs"),
+cor(t14, t17, use = "complete.obs"))
+)
 
 
 
-
-
-
+acf(t11, na.action = na.pass, lag.max = 450, las = 1, main = plot_title)
 
 
 
@@ -129,13 +136,7 @@ t17 <- Y
 ccf(t4, t11, na.action = na.pass, main = "total in plots 4 and 11", las = 1,
     lag.max = 25, ylim = c(-0.1, 1.0))
 
-mean(c(cor(t4, t11, use = "complete.obs"),
-cor(t4, t14, use = "complete.obs"),
-cor(t4, t17, use = "complete.obs"),
-cor(t11, t14, use = "complete.obs"),
-cor(t11, t17, use = "complete.obs"),
-cor(t14, t17, use = "complete.obs"))
-)
+
 
 tt <- data.frame(t4, t11, t14, t17)
 mtt <- apply(tt, 1, mean)
