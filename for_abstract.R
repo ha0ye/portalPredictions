@@ -20,7 +20,7 @@ moon_data$date <- as.Date(moon_data$newmoondate)
 newmoon_dates <- dplyr::filter(moon_data, newmoonnumber %in% newmoons) %>% 
                       dplyr::select(newmoonnumber, newmoondate)
 
-newmoon_date <- dates <- as.Date(newmoon_dates$newmoondate)
+newmoon_date <- as.Date(newmoon_dates$newmoondate)
 yr <- format(newmoon_date, "%Y")
 
 newmoon_jday <- as.numeric(format(newmoon_date, "%j"))
@@ -35,6 +35,24 @@ ref_2_days_from_ref_1 <- as.numeric(difftime(ref_2, ref_1))
 days_in_decade <- ref_2_days_from_ref_1 + 1
 
 frac_of_decade <- round(newmoon_days_from_ref_1 / days_in_decade, 3)
+
+
+
+
+head(plot_data)
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
    
@@ -93,8 +111,15 @@ cor(t14, t17, use = "complete.obs"))
 
 acf(t11, na.action = na.pass, lag.max = 450, las = 1, main = plot_title)
 
+zz <- apply(log(data.frame(t4, t11, t14, t17)), 1, mean)
 
-
+windows(12,12)
+par(mfrow = c(3,2))
+plot(t4, type = 'l')
+plot(t17, type = 'l')
+plot(t11, type = 'l')
+plot(zz, type = 'l')
+plot(t14, type = 'l')
 
 
 
