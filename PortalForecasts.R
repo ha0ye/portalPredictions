@@ -1,20 +1,22 @@
-source('tools/data_tools.R')
-source('tools/forecast_tools.R')
-library(yaml)
+source("tools/forecast_tools.R")
 
-model_metadata = yaml.load_file("data/model_metadata.yaml")
-forecast_date = as.Date(model_metadata$forecast_date)
+model_metadata <- yaml::yaml.load_file("data/model_metadata.yaml")
+forecast_date <- as.Date(model_metadata$forecast_date)
 
-if(!(forecast_date == Sys.Date())){ stop('Data not updated') }
+if(!(forecast_date == Sys.Date())){ 
+  stop('Data not updated') 
+}
 
-#########Run all models##################################################  
+# Run all models 
+#  this will need to be generalized for models written in other languages
 cat("Running models", "\n")
 dir.create("tmp")
-sapply( list.files("models", full.names=TRUE), source ) ###Temporary, while only modeling in R
+sapply(list.files("models", full.names = TRUE), source) 
 
-#####Collect all forecast results and save to predictions directory######
+# Collect all forecast results and save to predictions directory
 cat("Compiling forecasts", "\n")
-newforecasts=forecastall(forecast_date)
+newforecasts <- forecastall(forecast_date)
 unlink("tmp/*")
-######Update Website#####################################################
+
+# Update Website
 rmarkdown::render_site()

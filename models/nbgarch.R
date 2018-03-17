@@ -5,9 +5,7 @@
 #  response variable)
 #  
 
-  library(tscount)
-  library(forecast)
-  source('tools/model_tools.R')
+  source("tools/model_tools.R")
 
 #' Function for nbGARCH
 #'
@@ -43,31 +41,30 @@
     output_fcast <- data.frame()
     output_aic <- data.frame()
 
-    for(s in species){
+    for (s in species){
 
       ss <- s
-      if(ss == "NA."){
+      if (ss == "NA."){
         ss <- "NA"
       }
       cat("Fitting negative binomial GARCH model for", ss, "\n")
 
-      species_abundance <- interpolated_abundances %>% extract2(s)
+      species_abundance <- interpolated_abundances %>% magrittr::extract2(s)
     
-      if(sum(species_abundance) == 0){
+      if (sum(species_abundance) == 0){
         spec_forecast <- zero_abund_forecast
         spec_aic <- 1e6
       } else{
-        nbgarch_mod <- tsglm(species_abundance, 
-                             model = list(past_obs = 1, past_mean = 12),
-                             distr = "nbinom", link = "log")
+        model_setup <- list(past_obs = 1, past_mean = 12)
+        nbgarch_mod <- tscount::tsglm(species_abundance, 
+                         model = model_setup, distr = "nbinom", link = "log")
         if(nbgarch_mod$sigmasq == Inf){
-          nbgarch_mod <- tsglm(species_abundance, 
-                               model = list(past_obs = 1, past_mean = 12),
-                               distr = "poisson", link = "log")
+          nbgarch_mod <- tscount::tsglm(species_abundance, 
+                         model = model_setup, distr = "poisson", link = "log")
         }
 
         spec_forecast <- predict(nbgarch_mod, num_forecast_newmoons, 
-                                   level = CI_level)
+                           level = CI_level)
         spec_aic <- AIC(nbgarch_mod)
         
       } 
@@ -76,31 +73,26 @@
       LowerPI <- as.numeric(spec_forecast$interval[, 1]) 
       UpperPI <- as.numeric(spec_forecast$interval[, 2])
       spec_output_fcast <- data.frame(date = forecast_date, 
-                                      forecastmonth = forecast_months, 
-                                      forecastyear = forecast_years,
-                                      newmoonnumber = forecast_newmoons, 
-                                      currency = "abundance", 
-                                      model = "nbGARCH",
-                                      level = level, 
-                                      species = ss, 
-                                      estimate = estimate,
-                                      LowerPI = LowerPI, 
-                                      UpperPI = UpperPI,
-                                      fit_start_newmoon = fit_start_newmoon,
-                                      fit_end_newmoon = fit_end_newmoon,
-                                      initial_newmoon = initial_newmoon,
-                                      stringsAsFactors = FALSE)
+                             forecastmonth = forecast_months, 
+                             forecastyear = forecast_years,
+                             newmoonnumber = forecast_newmoons, 
+                             currency = "abundance", model = "nbGARCH",
+                             level = level, species = ss, estimate = estimate,
+                             LowerPI = LowerPI, UpperPI = UpperPI,
+                             fit_start_newmoon = fit_start_newmoon,
+                             fit_end_newmoon = fit_end_newmoon,
+                             initial_newmoon = initial_newmoon,
+                             stringsAsFactors = FALSE)
       output_fcast <- rbind(output_fcast, spec_output_fcast)
 
       spec_output_aic <- data.frame(date = forecast_date, 
-                                    currency = 'abundance', 
-                                    model = 'nbGARCH', 
-                                    level = level, species = ss, 
-                                    aic = as.numeric(spec_aic), 
-                                    fit_start_newmoon = fit_start_newmoon,
-                                    fit_end_newmoon = fit_end_newmoon,
-                                    initial_newmoon = initial_newmoon,
-                                    stringsAsFactors = FALSE)
+                           currency = "abundance", model = "nbGARCH", 
+                           level = level, species = ss, 
+                           aic = as.numeric(spec_aic), 
+                           fit_start_newmoon = fit_start_newmoon,
+                           fit_end_newmoon = fit_end_newmoon,
+                           initial_newmoon = initial_newmoon,
+                           stringsAsFactors = FALSE)
 
       output_aic <- rbind(output_aic, spec_output_aic)
 
@@ -114,7 +106,7 @@
 
   all <- read.csv("data/rodent_all.csv")
   controls <- read.csv("data/rodent_controls.csv")
-  model_metadata <- yaml.load_file("data/model_metadata.yaml")
+  model_metadata <- yaml::yaml.load_file("data/model_metadata.yaml")
   forecast_date <- as.Date(model_metadata$forecast_date)
   file_suffix <- model_metadata$filename_suffix
   forecast_months <- model_metadata$rodent_forecast_months
@@ -123,30 +115,29 @@
   num_fcast_nmoons <- length(forecast_months)
 
   forecasts_all <- forecast_nbgarch(abundances = all, 
-                                    forecast_date = forecast_date,
-                                    forecast_months = forecast_months, 
-                                    forecast_years = forecast_years,
-                                    forecast_newmoons = forecast_newmoons,
-                                    level = "All",
-                                    num_forecast_newmoons = num_fcast_nmoons, 
-                                    CI_level = 0.9)
+                     forecast_date = forecast_date,
+                     forecast_months = forecast_months, 
+                     forecast_years = forecast_years,
+                     forecast_newmoons = forecast_newmoons,
+                     level = "All", num_forecast_newmoons = num_fcast_nmoons, 
+                     CI_level = 0.9)
 
   forecasts_controls <- forecast_nbgarch(abundances = controls, 
-                                     forecast_date = forecast_date,
-                                     forecast_months = forecast_months, 
-                                     forecast_years = forecast_years,
-                                     forecast_newmoons = forecast_newmoons,
-                                     level = "Controls",
-                                     num_forecast_newmoons = num_fcast_nmoons, 
-                                     CI_level = 0.9)
+                          forecast_date = forecast_date,
+                          forecast_months = forecast_months, 
+                          forecast_years = forecast_years,
+                          forecast_newmoons = forecast_newmoons,
+                          level = "Controls",
+                          num_forecast_newmoons = num_fcast_nmoons, 
+                          CI_level = 0.9)
 
   forecasts <- rbind(forecasts_all[[1]], forecasts_controls[[1]])
   aics <- rbind(forecasts_all[[2]], forecasts_controls[[2]])
 
   fcast_filename <- paste("nbGARCH", file_suffix, ".csv", sep = "")
-  fcast_path <- file.path('tmp', fcast_filename)
+  fcast_path <- file.path("tmp", fcast_filename)
   write.csv(forecasts, fcast_path, row.names = FALSE)
 
   aic_filename <- paste("nbGARCH", file_suffix, "_model_aic.csv", sep = "")
-  aic_path <- file.path('tmp', aic_filename)
+  aic_path <- file.path("tmp", aic_filename)
   write.csv(aics, aic_path, row.names = FALSE)
