@@ -33,11 +33,11 @@ get_rodent_data <- function(moons, forecast_date){
 
   # Drop non-control treatments and add in newmoonnumber
   controls <- controls %>%
-                dplyr::filter(treatment == 'control') %>%
-                dplyr::select(-treatment) %>%
-                dplyr::inner_join(moons, by = c("period" = "period")) %>%
-                subset(newmoonnumber >= historic_start_newmoon) %>%
-                dplyr::select(-newmoondate, -censusdate)
+              dplyr::filter(treatment == 'control') %>%
+              dplyr::select(-treatment) %>%
+              dplyr::inner_join(moons, by = c("period" = "period")) %>%
+              subset(newmoonnumber >= historic_start_newmoon) %>%
+              dplyr::select(-newmoondate, -censusdate)
   
   # All plots
   all <- portalr::abundance(level = "Site", type = "Rodents", length = "all", 
@@ -48,9 +48,9 @@ get_rodent_data <- function(moons, forecast_date){
   # The total rodent count across the entire site
   all$total <- rowSums(all[ , -(1)])
   all <- all %>% 
-           dplyr::inner_join(moons,by = c("period"="period")) %>%
-           subset(period >= historic_start_period) %>%
-           dplyr::select(-newmoondate, -censusdate)
+         dplyr::inner_join(moons,by = c("period"="period")) %>%
+         subset(period >= historic_start_period) %>%
+         dplyr::select(-newmoondate, -censusdate)
     
   rodent_data <- list()
   rodent_data$controls <- controls

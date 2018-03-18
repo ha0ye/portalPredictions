@@ -30,8 +30,7 @@
     cat("Fitting AutoARIMA model for total \n")
     interpolated_abundances <- interpolate_abundance(abundances)
 
-    aa_model <- forecast::auto.arima(interpolated_abundances$total, 
-                  lambda = 0)
+    aa_model <- forecast::auto.arima(interpolated_abundances$total)
     aa_forecast <- forecast::forecast(aa_model, h = num_forecast_newmoons,
                      level = CI_level, fan = TRUE)
 

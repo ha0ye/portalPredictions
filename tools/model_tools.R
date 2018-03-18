@@ -146,10 +146,10 @@ get_climate_forecasts <- function(climate_model = "ENSMEAN",
   colnames(df4)<- c("date", "lat", "lon", "precipitation")
   df4$precipitation[which(df4$precipitation < 0)] <- 0
   df <- dplyr::right_join(df1, df2) %>% 
-          dplyr::right_join(df3) %>% 
-          dplyr::right_join(df4) %>%
-          dplyr::mutate(date = lubridate::as_date(date)) %>% 
-          dplyr::select(-lat, -lon)
+        dplyr::right_join(df3) %>% 
+        dplyr::right_join(df4) %>%
+        dplyr::mutate(date = lubridate::as_date(date)) %>% 
+        dplyr::select(-lat, -lon)
 
   # F to C and inches to mm
   df$mintemp <- (df$mintemp - 32) * 5 / 9
@@ -166,7 +166,7 @@ get_climate_forecasts <- function(climate_model = "ENSMEAN",
   avail_historic <- which(daily_forecasts$date %in% historic$date)
   n_avail_historic <- length(avail_historic)
 
-  if(n_avail_historic > 0){
+  if (n_avail_historic > 0){
     dates_avail <- daily_forecasts$date[avail_historic]
     in_hist <- which(historic$date %in% dates_avail)
     in_fcast <- which(daily_forecasts$date %in% dates_avail)
@@ -198,8 +198,8 @@ get_climate_forecasts <- function(climate_model = "ENSMEAN",
                       meantemp = mean(meantemp, na.rm = T), 
                       precipitation = sum(precipitation, na.rm = T))
   nm_fcasts <- daily_forecasts %>% 
-                 dplyr::group_by(newmoonnumber) %>%
-                 dplyr::summarize(!!!summarizing)
+               dplyr::group_by(newmoonnumber) %>%
+               dplyr::summarize(!!!summarizing)
 
   return(nm_fcasts)
 }
@@ -220,18 +220,18 @@ fcast_weather <- function(start = as.numeric(format(Sys.Date(), "%Y")), moons,
                           lag = 6, lead_time = 6){
   
   newweather <- portalr::weather("newmoon",fill=TRUE) %>%
-                  dplyr::select(-c(locally_measured,battery_low)) %>% 
-                  dplyr::mutate(year = as.numeric(format(date, "%Y"))) %>%
-                  dplyr::filter(year >= start-5)
+                dplyr::select(-c(locally_measured, battery_low)) %>% 
+                dplyr::mutate(year = as.numeric(format(date, "%Y"))) %>%
+                dplyr::filter(year >= (start - 5))
   incompletes <- which(is.na(newweather$newmoonnumber))
   if(length(incompletes) > 0 ){
     newweather <- newweather[-incompletes, ]  
   }
 
+  climate_fcast <- get_climate_forecasts(lead_time = lead_time, moons = moons)
   fcast <- tail(newweather, lag) %>% 
-              dplyr::select(-year, -date) %>%
-              dplyr::bind_rows(get_climate_forecasts(lead_time = lead_time, 
-                moons = moons))
+           dplyr::select(-year, -date) %>%
+           dplyr::bind_rows(climate_fcast)
 
   return(fcast)
 }

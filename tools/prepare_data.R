@@ -11,7 +11,7 @@ portalr::download_observations(release_only = FALSE)
 
 moons <- get_moon_data()
 curr_moons <- moons %>%
-                dplyr::select(newmoonnumber, newmoondate, period, censusdate)
+              dplyr::select(newmoonnumber, newmoondate, period, censusdate)
 curr_moons$newmoondate <- as.Date(as.character(curr_moons$newmoondate))
 future_moons <- portalr::get_future_moons(moons)
 total_moons <- rbind(curr_moons, future_moons)
@@ -19,8 +19,8 @@ total_moons <- rbind(curr_moons, future_moons)
 rodent_data <- get_rodent_data(moons, forecast_date)
 cols <- c("mintemp", "maxtemp", "meantemp", "precipitation", "newmoonnumber")
 weather_data <- portalr::weather("newmoon", fill = TRUE) %>% 
-                  dplyr::ungroup() %>%
-                  dplyr::select(cols)
+                dplyr::ungroup() %>%
+                dplyr::select(cols)
 incompletes <- which(is.na(weather_data$newmoonnumber))
 if (length(incompletes) > 0){
   weather_data <- weather_data[-incompletes, ]

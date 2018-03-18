@@ -34,7 +34,7 @@ forecastall <- function(forecast_date, filename_suffix = "forecasts"){
   append_csv(all_model_aic, model_aic_filename)
   
   ensemble <- make_ensemble(forecasts) %>% 
-                subset(select = colnames(forecasts))
+              subset(select = colnames(forecasts))
   append_csv(ensemble, forecast_filename)
   
   return(list(forecasts, all_model_aic))
@@ -61,14 +61,14 @@ compile_aic_weights <- function(forecast_folder = "./predictions"){
 
   read_formula <- ~read.csv(.x, na.strings = '', stringsAsFactors = FALSE)
   all_aic <- purrr::map(aic_filenames, read_formula) %>% 
-               dplyr::bind_rows()
+             dplyr::bind_rows()
 
   wts <- all_aic %>%
-           dplyr::group_by(date, currency, level, species, fit_start_newmoon, 
-             fit_end_newmoon, initial_newmoon) %>%
-           dplyr::mutate(delta_aic = aic - min(aic), 
-             weight = exp(-0.5 * delta_aic) / sum(exp(-0.5 * delta_aic))) %>%
-           dplyr::ungroup()
+         dplyr::group_by(date, currency, level, species, fit_start_newmoon, 
+           fit_end_newmoon, initial_newmoon) %>%
+         dplyr::mutate(delta_aic = aic - min(aic), 
+           weight = exp(-0.5 * delta_aic) / sum(exp(-0.5 * delta_aic))) %>%
+         dplyr::ungroup()
   return(wts)
 }
 
@@ -139,7 +139,7 @@ make_ensemble <- function(all_forecasts, models_to_use = NA, CI_level = 0.9){
 get_sp_predicts <- function(data, lvl, lead_time){
 
   data <- transform(data, forecast_date = format(date, "%b %Y"))
-  data <- transform(date = as.Date(date, "%Y-%m-%d"))
+  data$date <- as.Date(data$date)
   data1 <- dplyr::filter(data, level == lvl, date == max(as.Date(date)))
   target_moon <- min(data1$newmoonnumber) + (lead_time - 1)
   data2 <- dplyr::filter(data1, newmoonnumber == target_moon)
@@ -181,7 +181,7 @@ plot_species_forecast <- function(data, title) {
                      by.x = "speciescode", by.y = "species")
   
   sp_predict <- ggplot2::ggplot(data,
-                  aes(x = estimate, y = reorder(species, estimate), 
+                  ggplot2::aes(x = estimate, y = reorder(species, estimate), 
                     xmin = LowerPI, xmax = UpperPI)) +
                 ggplot2::geom_point() +
                 ggplot2::geom_errorbarh() +
@@ -253,7 +253,7 @@ calculate_forecast_error <- function(observations, forecasts,
   # TODO: Make the lead time the actual days or weeks once more frequent 
   #   forecasts are being made(see #37)
   forecasts <- forecasts %>%
-                 dplyr::mutate(lead_time = newmoonnumber - initial_newmoon)
+               dplyr::mutate(lead_time = newmoonnumber - initial_newmoon)
   
   # Calculate error
   in_jn_cols <- c("newmoonnumber", "currency", "level", "species")
@@ -270,7 +270,7 @@ calculate_forecast_error <- function(observations, forecasts,
   } else if (error_metric == "coverage"){
     grouping <- quos(model, currency, level, species, lead_time, error_metric)
     new_vars <- quos(within_prediction_interval = actual >= LowerPI & 
-                     actual <= UpperPI, error_metric = "coverage")
+                  actual <= UpperPI, error_metric = "coverage")
     summarising <- quos(error_value = mean(within_prediction_interval))
     comparisons <- forecasts %>%
                    dplyr::inner_join(observations, by = in_jn_cols) %>%
@@ -298,7 +298,8 @@ calculate_forecast_error <- function(observations, forecasts,
 #' @param error_metric str error metric used
 #'
 plot_lead_time_errors <- function(error_df, level, species, currency, 
-                           error_metric){
+                                  error_metric){
+
   plot_title <- paste0("Level: ", level, ", Species: ", species, ", 
                   Currency: ", currency)
 
@@ -326,7 +327,7 @@ forecast_is_valid <- function(forecast_df, verbose = FALSE){
   is_valid <- TRUE
   violations <- c()
 
-  valid_columns <- c("date", "forecastmonth", "forecastyear", "newmoonnumber", 
+  valid_columns <- c("date", "forecastmonth", "forecastyear", "newmoonnumber",
                      "model", "currency", "level", "species", "estimate",
                      "LowerPI", "UpperPI", "fit_start_newmoon",
                      "fit_end_newmoon", "initial_newmoon")
@@ -338,9 +339,9 @@ forecast_is_valid <- function(forecast_df, verbose = FALSE){
                      "PF", "PH", "PI", "PL", "PM", "PP", "RF", "RM", "RO", 
                      "SF", "SH", "SO", "NA")
 
-  if(!(all(colnames(forecast_df) %in% valid_columns) & 
+  if (!(all(colnames(forecast_df) %in% valid_columns) & 
        all(valid_columns %in% colnames(forecast_df)))){
-    if(verbose){
+    if (verbose){
       print("Forecast file column names invalid")
     }
     return(FALSE)
@@ -349,60 +350,60 @@ forecast_is_valid <- function(forecast_df, verbose = FALSE){
   # TODO: Account for dates that are formatted correctly but potentially
   #  many years off.
   forecast_df$date <- as.Date(forecast_df$date, "%Y-%m-%d")
-  if(any(is.na(forecast_df$date))){
+  if (any(is.na(forecast_df$date))){
     is_valid <- FALSE
     violations <- c("date", violations)
   }
-  if(!all(unique(forecast_df$currency) %in% valid_currencies)){
+  if (!all(unique(forecast_df$currency) %in% valid_currencies)){
     is_valid <- FALSE
     violations <- c("currency", violations)
   }
-  if(!all(unique(forecast_df$level) %in% valid_levels)){
+  if (!all(unique(forecast_df$level) %in% valid_levels)){
     is_valid <- FALSE
     violations <- c("level", violations)
   }
-  if(!all(unique(forecast_df$species) %in% valid_species)){
+  if (!all(unique(forecast_df$species) %in% valid_species)){
     is_valid <- FALSE
     violations <- c("species", violations) 
   }
-  if(any(is.na(forecast_df$estimate))){ 
+  if (any(is.na(forecast_df$estimate))){ 
     is_valid <- FALSE
     violations <- c("NA esimates", violations) 
   }
-  if(any(is.na(forecast_df$LowerPI))){ 
+  if (any(is.na(forecast_df$LowerPI))){ 
     is_valid <- FALSE
     violations <- c("NA LowerPI", violations)
   }
-  if(any(is.na(forecast_df$UpperPI))){
+  if (any(is.na(forecast_df$UpperPI))){
     is_valid <- FALSE 
     violations <- c("NA UpperPI", violations)
   }
-  if(!is.integer(forecast_df$fit_start_newmoon)){ 
+  if (!is.integer(forecast_df$fit_start_newmoon)){ 
     is_valid <- FALSE
     violations <- c("fit_start_newmoon not int")
   }
-  if(!is.integer(forecast_df$fit_end_newmoon)){ 
+  if (!is.integer(forecast_df$fit_end_newmoon)){ 
     is_valid <- FALSE
     violations <- c("fit_end_newmoon not int")
   }
-  if(!is.integer(forecast_df$initial_newmoon)){ 
+  if (!is.integer(forecast_df$initial_newmoon)){ 
     is_valid <- FALSE
     violations <- c("initial_newmoon not int")
   }
-  if(any(is.na(forecast_df$fit_start_newmoon))){ 
+  if (any(is.na(forecast_df$fit_start_newmoon))){ 
     is_valid <- FALSE
     violations <- c("fit_start_newmoon contains NA")
   }
-  if(any(is.na(forecast_df$fit_end_newmoon))){ 
+  if (any(is.na(forecast_df$fit_end_newmoon))){ 
     is_valid <- FALSE
     violations <- c("fit_end_newmoon contains NA")
   }
-  if(any(is.na(forecast_df$initial_newmoon))){ 
+  if (any(is.na(forecast_df$initial_newmoon))){ 
     is_valid <- FALSE
     violations <- c("initial_newmoon contains NA")
   }
   
-  if(verbose & length(violations) > 0){
+  if (verbose & length(violations) > 0){
     print(paste("Forecast validation failed: ", violations), sep = "")
   }
   return(is_valid)
@@ -433,13 +434,13 @@ compile_forecasts <- function(forecast_folder = './predictions',
   fcast_filenames <- fcast_filenames[!grepl("model_aic", fcast_filenames)]
   all_forecasts <- data.frame()
 
-  for(this_forecast_file in fcast_filenames){
+  for (this_forecast_file in fcast_filenames){
     this_forecast_data <- try(read.csv(this_forecast_file, na.strings = "", 
                                 stringsAsFactors = FALSE))
-    if(class(this_forecast_data) %in% "try-error"){
-      if(verbose){
+    if (class(this_forecast_data) %in% "try-error"){
+      if (verbose){
         print(paste("File not readable: ", this_forecast_file, sep = ""))
-      }else {
+      } else {
         warning(paste("File not readable: ", this_forecast_file, sep = ""))
       }
       next
@@ -449,12 +450,12 @@ compile_forecasts <- function(forecast_folder = './predictions',
       print(paste("Testing file ", this_forecast_file, sep = ""))
     }
     if (forecast_is_valid(this_forecast_data, verbose = verbose)){
-      if(verbose) {
+      if (verbose) {
         print(paste("File format is valid: ", this_forecast_file, sep = ""))
         print("-------")
       }
       all_forecasts <- all_forecasts %>%
-                         dplyr::bind_rows(this_forecast_data)
+                       dplyr::bind_rows(this_forecast_data)
     } else {
       if (verbose){
         print(paste("File format not valid: ", this_forecast_file, sep = ""))
@@ -501,13 +502,13 @@ forecast_viz <- function(obs_data, obs_date_col_name, obs_val_col_name,
 
   ggplot2::ggplot(obs_data_sub, ggplot2::aes_string(x = obs_date_col_name)) +
   ggplot2::geom_ribbon(data = for_data_sub, 
-    mapping = ggplot2::aes_string(x = for_date_col_name, 
+    mapping = ggplot2::aes_string(x = for_date_col_name, group = 1, 
                 ymin = for_lowerpi_col_name, ymax = for_upperpi_col_name), 
     fill = "lightblue") +
-  ggplot2::geom_line(ggplot2::aes_string(y = obs_val_col_name)) +
+  ggplot2::geom_line(ggplot2::aes_string(y = obs_val_col_name, group = 1)) +
   ggplot2::geom_line(data = for_data_sub, 
     mapping = ggplot2::aes_string(x = for_date_col_name, 
-                y = for_val_col_name), 
+                y = for_val_col_name, group = 1), 
     color = "blue") +
   ggplot2::labs(x = "", y = ylabel)
 }

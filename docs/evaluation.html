@@ -221,17 +221,101 @@ $(document).ready(function () {
 </div>
 
 
-<div id="how-have-the-models-done-recently" class="section level2">
+<section id="how-have-the-models-done-recently" class="level2">
 <h2>How have the models done recently?</h2>
-<p>This graph shows the forecast error of some recent forecasts for the most recent sampling dates. This is shown for all model types in the columns and several common rodent species (and total rodents) in the rows. These evaluations are for the Control plots where no manipulation is done. <img src="evaluation_files/figure-html/recent_eval-1.png" width="1440" /></p>
-</div>
-<div id="how-have-the-models-done-historically" class="section level2">
+<p>This graph shows the forecast error of some recent forecasts for the most recent sampling dates. This is shown for all model types in the columns and several common rodent species (and total rodents) in the rows. These evaluations are for the Control plots where no manipulation is done.</p>
+<p>```{r recent_eval, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 15, fig.height = 15}</p>
+<p>#Get all the recent forecasts forecast_data &lt;- compile_forecasts(use_hindcasts = FALSE) %&gt;% dplyr::filter(model %in% models_of_interest)</p>
+</section>
+<section id="round-so-that-large-decimal-place-differences-do-not-cause" class="level1">
+<h1>Round so that large decimal place differences do not cause</h1>
+</section>
+<section id="similar-forecasts-to-be-seen-as-distinct." class="level1">
+<h1>similar forecasts to be seen as distinct.</h1>
+<p>forecast_data<span class="math inline">\(estimate &lt;- round(forecast_data\)</span>estimate, 3) forecast_data<span class="math inline">\(LowerPI &lt;- round(forecast_data\)</span>LowerPI, 3) forecast_data<span class="math inline">\(UpperPI &lt;- round(forecast_data\)</span>UpperPI, 3)</p>
+</section>
+<section id="keep-1-forecast-per-unique-initial_newmoon.-when-there-are-multiple" class="level1">
+<h1>Keep 1 forecast per unique initial_newmoon. When there are multiple</h1>
+</section>
+<section id="forecasts-using-the-same-initial_newmoon-use-the-first-one." class="level1">
+<h1>forecasts using the same initial_newmoon, use the first one.</h1>
+<p>forecast_dates_to_keep &lt;- forecast_data %&gt;% dplyr::select(date, initial_newmoon) %&gt;% dplyr::distinct() %&gt;% dplyr::group_by(initial_newmoon) %&gt;% dplyr::filter(date == min(date)) %&gt;% dplyr::ungroup() %&gt;% dplyr::mutate(keep = “yes”)</p>
+<p>joining &lt;- c(“date”, “initial_newmoon”) forecast_data &lt;- forecast_data %&gt;% dplyr::left_join(forecast_dates_to_keep, by = joining) %&gt;% dplyr::filter(keep == “yes”) %&gt;% dplyr::select(-keep)</p>
+</section>
+<section id="combine-forecasts-and-oservations" class="level1">
+<h1>Combine forecasts and oservations</h1>
+<p>joining &lt;- c(“newmoonnumber”, “level”, “species”, “currency”) forecast_errors &lt;- forecast_data %&gt;% dplyr::left_join(observation_data, by = joining) %&gt;% dplyr::mutate(rmse = sqrt((estimate - actual)^2))</p>
+</section>
+<section id="sometimes-there-are-model-runs-on-the-same-day-and-with-all-the-same-info" class="level1">
+<h1>Sometimes there are model runs on the same day and with all the same info,</h1>
+</section>
+<section id="this-gets-rid-of-those" class="level1">
+<h1>this gets rid of those</h1>
+<p>forecast_errors &lt;- forecast_errors %&gt;% dplyr::distinct()</p>
+</section>
+<section id="drop-any-entries-that-dont-have-an-observation-ie.-a-rainy-sample-period-forecast_errors---forecast_errors-dplyrfilteris.naactual" class="level1">
+<h1>Drop any entries that don“t have an observation # (ie. a rainy sample period) forecast_errors &lt;- forecast_errors %&gt;% dplyr::filter(!is.na(actual))</h1>
+</section>
+<section id="filter-to-common-species-and-apply-the-full-name" class="level1">
+<h1>Filter to common species and apply the full name</h1>
+<p>forecast_errors &lt;- forecast_errors %&gt;% dplyr::filter(species %in% species_of_interest) %&gt;% dplyr::left_join(species_names, by = “species”) %&gt;% dplyr::select(-species) %&gt;% dplyr::rename(species = full_species_name)</p>
+</section>
+<section id="add-a-newline-to-the-longer-species-names" class="level1">
+<h1>Add a newline to the longer species names</h1>
+<p>forecast_errors$species &lt;- with(forecast_errors, ifelse(nchar(species) &gt; 15, stringr::str_replace(species,&quot; “,”“), species))</p>
+</section>
+<section id="displaying-the-data-from-many-forecasts-in-the-past-can-create-a-mess-of-a" class="level1">
+<h1>Displaying the data from many forecasts in the past can create a mess of a</h1>
+</section>
+<section id="plot.-see-218.-so-here-three-forecasts-are-chosen-from-1-6-and-12" class="level1">
+<h1>plot. see #218. So here three forecasts are chosen from 1, 6, and 12</h1>
+</section>
+<section id="newmoons-into-the-past.-sometimes-forecasts-data-is-missing-for-a-particular" class="level1">
+<h1>newmoons into the past. Sometimes forecasts data is missing for a particular</h1>
+</section>
+<section id="initial_newmoon-the-recursive-function-here-attempts-to-find-another-one" class="level1">
+<h1>initial_newmoon, the recursive function here attempts to find another one</h1>
+</section>
+<section id="from-the-same-time-plutsminus-2-month-period.-this-ensures-3-forecasts" class="level1">
+<h1>from the same time pluts/minus 2 month period. This ensures 3 forecasts</h1>
+</section>
+<section id="are-always-shown." class="level1">
+<h1>are always shown.</h1>
+</section>
+<section id="if-there-is-no-data-for-initial_newmoon-500-this-will-check-nearby-dates" class="level1">
+<h1>If there is no data for initial_newmoon 500, this will check nearby dates</h1>
+</section>
+<section id="in-this-order-499-501-498-402" class="level1">
+<h1>in this order: 499, 501, 498, 402</h1>
+<p>update_initial_newmoon &lt;- function(potential_initial_newmoon, attempt = 1){ if (attempt == 6){ return(NA) } lead_time_data &lt;- forecast_errors %&gt;% dplyr::filter(initial_newmoon == potential_initial_newmoon)</p>
+<p># Alternate steps of -1, +2, -3, +4 next_try_step &lt;- ifelse(attempt%%2 == 0, attempt, attempt * -1)</p>
+<p># no data to show? then try one month back if (nrow(lead_time_data) == 0){ next_nm &lt;- potential_initial_newmoon + next_try_step return(update_initial_newmoon(next_nm, attempt + 1)) } else { return(potential_initial_newmoon) }</p>
+<p>}</p>
+</section>
+<section id="adjust-this-to-add-more-than-3-forecast-dates-or-change-the-lead-times" class="level1">
+<h1>Adjust this to add more than 3 forecast dates, or change the lead times</h1>
+<p>lead_times_to_show &lt;- c(1,6,12) most_recent_observed_newmoon &lt;- max(new_moons$newmoonnumber) initial_newmoons_to_keep &lt;- most_recent_observed_newmoon - lead_times_to_show</p>
+<p>initial_newmoons_to_keep &lt;- sapply(initial_newmoons_to_keep, update_initial_newmoon)</p>
+<p>forecast_errors &lt;- forecast_errors %&gt;% dplyr::filter(initial_newmoon %in% initial_newmoons_to_keep)</p>
+<p>ggplot2::ggplot(forecast_errors, ggplot2::aes(x = censusdate, y = rmse, group = as.character(date), color = as.character(date))) + ggplot2::geom_point(size = 4)+ ggplot2::geom_line(size = 1.5) + ggplot2::scale_color_brewer(palette = “Dark2”) + ggplot2::scale_x_date(breaks = unique(forecast_errors$censusdate)) + ggplot2::facet_grid(species ~ model, scales = “free_y”) + ggplot2::theme_bw() + ggplot2::theme( axis.text.x = ggplot2::element_text(angle = 45, hjust = 0.99, debug = FALSE), axis.text = ggplot2::element_text(size = 12), axis.title = ggplot2::element_text(size = 20), strip.text = ggplot2::element_text(size = 12), legend.text = ggplot2::element_text(size = 15), legend.title = ggplot2::element_text(size = 18)) + ggplot2::labs(x = “Sample Date”,y = “RMSE”, color = “Forecast Issue”)</p>
+<p>```</p>
+<section id="how-have-the-models-done-historically" class="level2">
 <h2>How have the models done historically?</h2>
 <p>These graphs show errors as a function of lead time. The lead time is the number of months into the future that forecast is made. The error values are an average of all forecast errors using observations since 2010. Note that this currently uses hindcasts of the prior observations, and is also only for the Control plots.</p>
 <p><strong>RMSE</strong>: Root mean square error, this is a metric used to evaluate the point estimate of a forecast.<br />
-<strong>Coverage</strong>: This is the percentage of observations which fell within the % confidence interval of a forecast. Ideally this would be equal to . If it’s higher than the forecasts intervals are too wide, if it’s lower then the forecast intervals are too narrow.</p>
-<p><img src="evaluation_files/figure-html/hindcast_eval-1.png" width="864" /></p>
-</div>
+<strong>Coverage</strong>: This is the percentage of observations which fell within the 90% confidence interval of a forecast. Ideally this would be equal to 0.9. If it’s higher than 0.9 the forecasts intervals are too wide, if it’s lower, then the forecast intervals are too narrow.</p>
+<p>```{r hindcast_eval, echo = FALSE, message = FALSE, warning = FALSE, fig.width = 9, fig.height = 15}</p>
+</section>
+</section>
+<section id="get-the-all-the-forecasts-made-during-observation-period" class="level1">
+<h1>Get the all the forecasts made during observation period</h1>
+</section>
+<section id="dropping-rmse-greater-than-this-because-it-throws-off-all-the-graphs" class="level1">
+<h1>Dropping RMSE greater than this because it throws off all the graphs</h1>
+<p>forecast_data &lt;- compile_forecasts(use_hindcasts = TRUE) fcast_err &lt;- calculate_forecast_error(observation_data, forecast_data, error_metric = “coverage”) forecast_errors &lt;- calculate_forecast_error(observation_data, forecast_data, error_metric = “RMSE”) %&gt;% dplyr::filter(error_value &lt; 200) %&gt;% dplyr::bind_rows(fcast_err) %&gt;% dplyr::left_join(species_names, by = “species”)</p>
+<p>ggplot2::ggplot(forecast_errors, ggplot2::aes(x = lead_time, y = error_value, group = model, color = model)) + ggplot2::geom_point()+ ggplot2::geom_line() + ggplot2::geom_hline(yintercept = 0.9) + ggplot2::labs(x = “Lead Time (New Moons)”) + ggplot2::facet_wrap(full_species_name ~ error_metric, scales = “free_y”, ncol = 2) + ggplot2::theme_bw() + ggplot2::labs(y = “Error Value”, colour = “Model”)</p>
+<p>```</p>
+</section>
 
 
 
