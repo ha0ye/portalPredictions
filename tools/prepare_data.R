@@ -14,18 +14,23 @@ forecast_date <- Sys.Date()
 portalr::download_observations(release_only = FALSE)
 
 moons <- get_moon_data()
+moons$newmoondate <- as.Date(as.character(moons$newmoondate))
 curr_moons <- moons %>%
               dplyr::select(newmoonnumber, newmoondate, period, censusdate)
-curr_moons$newmoondate <- as.Date(as.character(curr_moons$newmoondate))
 future_moons <- portalr::get_future_moons(moons)
 total_moons <- rbind(curr_moons, future_moons)
 
-actual_future_moons <- which(future_moons$newmoondate > forecast_date)
-nafm <- length(actual_future_moons)
-if (nafm < 12){
-  addl_moons <- 12 - nafm
-  nmoons <- 12 + addl_moons
-  future_moons <- portalr::get_future_moons(moons, num_future_moons = nmoons)
+not_future_moons <- which(future_moons$newmoondate < forecast_date)
+nnfm <- length(not_future_moons)
+if (nnfm < 12){
+  add_nfm <- future_moons[not_future_moons, ]
+  add_nfm$year <- as.numeric(format(add_nfm$newmoondate, "%Y"))
+  add_nfm$month <- as.numeric(format(add_nfm$newmoondate, "%m"))
+  moons <- rbind(moons, add_nfm)
+  curr_moons <- moons %>% 
+                dplyr::select(newmoonnumber, newmoondate, period, censusdate)
+  future_moons <- portalr::get_future_moons(moons)
+  total_moons <- rbind(curr_moons, future_moons)
 }
 
 rodent_data <- get_rodent_data(moons, forecast_date)
