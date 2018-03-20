@@ -1,3 +1,7 @@
+#
+# This script prepares the data as necessary for the forecast models to run
+#
+
 "%>%" <- magrittr::"%>%"
 source("tools/data_tools.R")
 
@@ -15,6 +19,14 @@ curr_moons <- moons %>%
 curr_moons$newmoondate <- as.Date(as.character(curr_moons$newmoondate))
 future_moons <- portalr::get_future_moons(moons)
 total_moons <- rbind(curr_moons, future_moons)
+
+actual_future_moons <- which(future_moons$newmoondate > forecast_date)
+nafm <- length(actual_future_moons)
+if (nafm < 12){
+  addl_moons <- 12 - nafm
+  nmoons <- 12 + addl_moons
+  future_moons <- portalr::get_future_moons(moons, num_future_moons = nmoons)
+}
 
 rodent_data <- get_rodent_data(moons, forecast_date)
 cols <- c("mintemp", "maxtemp", "meantemp", "precipitation", "newmoonnumber")
