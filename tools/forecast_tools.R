@@ -1,101 +1,127 @@
-library(tidyverse)
-library(lubridate)
-library(zoo)
-library(ggplot2)
-library(rmarkdown)
-library(RCurl)
-
-##########################Forecast processing############################
 #' Combine all new forecasts (from the tmp directory), add ensembles
 #' 
 #' @param forecast_date
 #' @param filename_suffix
 #' @return list(forecasts,all_model_aic)
 #' @example forecastall('forecasts')
+#'
+forecastall <- function(forecast_date, filename_suffix = "forecasts"){
+  
+  file_ptn <- paste(filename_suffix, ".csv", sep = "")
+  files <- list.files("tmp", pattern = file_ptn, full.names = TRUE)
+  colClasses <- c("Date", "integer", "integer", "integer", "character", 
+                  "character", "character", "character", "numeric", "numeric",
+                  "numeric", "integer", "integer", "integer")
+  fcasts <- do.call(rbind, 
+            lapply(files, read.csv, na.strings = "", colClasses  = colClasses))
 
-forecastall <- function(forecast_date,filename_suffix = 'forecasts') {
+  file_ptn <- paste(filename_suffix, "_model_aic.csv", sep = "")
+  files <- list.files("tmp", pattern = file_ptn, full.names = TRUE)
+
+  aics <- do.call(rbind,
+            lapply(files, read.csv, na.strings = ""))
   
-  #Append results to forecasts and AIC tables
-  forecasts = do.call(rbind,
-                      lapply(list.files("tmp",pattern = paste(filename_suffix, ".csv",sep=""), full.names = TRUE), 
-                             read.csv, na.strings = "", colClasses = c("Date", "integer", "integer", 
-                                                                       "integer", "character", "character", "character", 
-                                                                       "character", "numeric", "numeric", "numeric",
-                                                                       "integer", "integer", "integer")))
+  fcast_date <- as.character(forecast_date)
+  fcast_fname <- paste(fcast_date, filename_suffix, ".csv", sep = "")
+  forecast_filename <- file.path("predictions", fcast_fname)
+  aic_fname <- paste(fcast_date, filename_suffix, "_model_aic.csv", sep = "")
+  model_aic_filename <- file.path("predictions", aic_fname)
+  append_csv(fcasts, forecast_filename)
+  append_csv(aics, model_aic_filename)
   
-  all_model_aic = do.call(rbind,
-                          lapply(list.files("tmp",pattern = paste(filename_suffix, "_model_aic.csv",sep=""), full.names = TRUE), 
-                                 read.csv, na.strings = ""))
-  
-  forecast_filename = file.path('predictions', paste(as.character(forecast_date), filename_suffix, ".csv", sep=""))
-  model_aic_filename = file.path('predictions', paste(as.character(forecast_date), filename_suffix, "_model_aic.csv", sep=""))
-  append_csv(forecasts, forecast_filename)
-  append_csv(all_model_aic, model_aic_filename)
-  
-  ########Add ensembles to files############################################
-  ensemble=make_ensemble(forecasts) %>% 
-    subset(select=colnames(forecasts))
+  ensemble <- make_ensemble(fcasts) %>% 
+                subset(select = colnames(fcasts))
   append_csv(ensemble, forecast_filename)
   
-  return(list(forecasts,all_model_aic))
+  return(list(forecasts = fcasts, all_model_aic = aics))
 }
 
-######Tools for writing forecasts to file and aics to separate file###############
-#Appending a csv without re-writing the header.
-append_csv=function(df, filename){
-  write.table(df, filename, sep = ',', row.names = FALSE, col.names = !file.exists(filename), append = file.exists(filename))
+#' Appending a csv without re-writing the header.
+#' @param df data table to be written out
+#' @param filename filename of existing csv to be appended
+#' @return 
+#' @export
+#'
+append_csv <- function(df, filename){
+  write.table(df, filename, sep = ",", row.names = FALSE, 
+    col.names = !file.exists(filename), append = file.exists(filename))
 }
 
-#Get all model aic values and calculate akaike weights
-compile_aic_weights = function(forecast_folder='./predictions'){
-  model_aic_filenames = list.files(forecast_folder, full.names = TRUE, recursive = TRUE)
-  model_aic_filenames = model_aic_filenames[grepl('model_aic',model_aic_filenames)]
+#' calculate akaike weights
+#' @param forecast_folder folder where the forecast files are
+#' @return model weights
+#' @export
+#'
+compile_aic_weights <- function(forecast_folder = "./predictions"){
+  aic_files <- list.files(forecast_folder, full.names = TRUE, recursive = TRUE)
+  aic_files <- aic_files[grepl("model_aic", aic_files)]
 
-  all_model_aic = purrr::map(model_aic_filenames, ~read.csv(.x, na.strings = '', stringsAsFactors = FALSE)) %>% 
-    bind_rows()
+  aics <- purrr::map(aic_files, 
+            ~read.csv(.x, na.strings = "", stringsAsFactors = FALSE)) %>% 
+          dplyr::bind_rows()
+ 
+  grps <- rlang::quos(date, currency, level, species, fit_start_newmoon, 
+            fit_end_newmoon, initial_newmoon)
+ 
+  wts <- aics %>%
+    dplyr::group_by(!!!grps) %>%
+    dplyr::mutate(delta_aic = aic - min(aic), 
+              weight = exp(-0.5 * delta_aic) / sum(exp(-0.5*delta_aic))) %>%
+    dplyr::ungroup()
 
-  all_weights = all_model_aic %>%
-    group_by(date,currency, level, species, fit_start_newmoon, fit_end_newmoon, initial_newmoon) %>%
-    mutate(delta_aic = aic-min(aic), weight = exp(-0.5*delta_aic) / sum(exp(-0.5*delta_aic))) %>%
-    ungroup()
-  return(all_weights)
+  return(wts)
 }
 
-#Create the ensemble model from all other forecasts
-#Uses the weighted mean and weighted sample variance
-#https://en.wikipedia.org/wiki/Weighted_arithmetic_mean
-make_ensemble=function(all_forecasts, models_to_use=NA, CI_level = 0.9){
-  weights = compile_aic_weights()
-  weights$date=as.Date(weights$date)
-  CI_quantile = qnorm((1-CI_level)/2, lower.tail = FALSE)
+#' Create the ensemble model from all other forecasts
+#' 
+#' @description Uses the weighted mean and weighted sample variance
+#' @param all_forecasts alll forecasts
+#' @param models_to_use models to use
+#' @param CI_level confidence interval level
+#' @return ensemble
+#' @export
+#'
+make_ensemble <- function(all_forecasts, models_to_use = NA, CI_level = 0.9){
 
-  #Mean is the weighted mean of all model means.
-  #Variance is the weighted mean of all model variances + the variances of the weighted mean 
-  #using the unbiased estimate of sample variance. See https://github.com/weecology/portalPredictions/pull/65
-  #We only store the prediction interval for models, so backcalculate individual model variance
-  #assuming the same CI_level throughout. 
-  weighted_estimates = all_forecasts %>%
-    mutate(model_var = ((UpperPI - estimate)/CI_quantile)^2) %>%
-    left_join(weights, by=c('date','model','currency','level','species','fit_start_newmoon','fit_end_newmoon','initial_newmoon')) %>%
-    group_by(date, newmoonnumber, forecastmonth, forecastyear,level, currency, species, fit_start_newmoon, fit_end_newmoon, initial_newmoon) %>%
-    summarise(ensemble_estimate = sum(estimate*weight), 
-              weighted_ss = sum(weight * (estimate - ensemble_estimate)^2) ,
-              ensemble_var   = sum(model_var * weight) + weighted_ss / (n()*sum(weight)-1),
-              sum_weight = sum(weight)) %>% #round because the numbers get very very small
-    ungroup() 
-              
-  #Assert that the summed weight of all the model ensembles is 1, as that's what the above variance estimates assume.
-  #Rounded to account for precision errors. Summed weights can also be NA if there are not weights availble for that ensemble. 
-  if(!all(round(weighted_estimates$sum_weight, 10) == 1 | is.na(weighted_estimates$sum_weight))){ stop('Summed weights do not equal 1')}
+  weights <- compile_aic_weights()
+  weights$date <- as.Date(weights$date)
+  CI_quantile <- qnorm((1 - CI_level) / 2, lower.tail = FALSE)
 
-  ensemble = weighted_estimates %>%
-    mutate(LowerPI = ensemble_estimate - (sqrt(ensemble_var) * CI_quantile),
-           UpperPI = ensemble_estimate + (sqrt(ensemble_var) * CI_quantile)) %>%
-    mutate(LowerPI = ifelse(LowerPI<0, 0, LowerPI)) %>%
-    rename(estimate = ensemble_estimate) %>%
-    select(-ensemble_var, -weighted_ss, -sum_weight)
+  leftj <- c("date", "model", "currency", "level", "species", 
+             "fit_start_newmoon", "fit_end_newmoon", "initial_newmoon")
+  grp <- rlang::quos(date, newmoonnumber, forecastmonth, forecastyear,level, 
+           currency, species, fit_start_newmoon, fit_end_newmoon, 
+           initial_newmoon)
+  mod_var <- rlang::quo(((UpperPI - estimate)/CI_quantile) ^ 2)
+  est <- rlang::quo(sum(estimate * weight))
+  wtss <- rlang::quo(sum(weight * (estimate - ensemble_estimate)^2))
+  ens_var <- rlang::quo(sum(model_var * weight) + 
+                        weighted_ss / (n() * sum(weight) - 1))
+  weighted_estimates <- all_forecasts %>%
+                        dplyr::mutate(model_var = !!mod_var) %>%
+                        dplyr::left_join(weights, by = leftj) %>%
+                        dplyr::group_by(!!!grp) %>%
+                        dplyr::summarise(ensemble_estimate = !!est, 
+                                         weighted_ss = !!wtss ,
+                                         ensemble_var = !!ens_var,
+                                         sum_weight = sum(weight)) %>% 
+                        dplyr::ungroup() 
+     
+  check_sum <- round(weighted_estimates$sum_weight, 10) == 1 
+  check_na <- is.na(weighted_estimates$sum_weight)       
+  if(!all(check_sum | check_na)){ 
+    stop("Summed weights do not equal 1")
+  }
+
+  PI_l <- rlang::quo(ensemble_estimate - (sqrt(ensemble_var) * CI_quantile))
+  PI_U <- rlang::quo(ensemble_estimate + (sqrt(ensemble_var) * CI_quantile))
+  ensemble <- weighted_estimates %>%
+              dplyr::mutate(LowerPI = !!PI_l, UpperPI = !!PI_U) %>%
+              dplyr::mutate(LowerPI = ifelse(LowerPI<0, 0, LowerPI)) %>%
+              dplyr::rename(estimate = ensemble_estimate) %>%
+              dplyr::select(-ensemble_var, -weighted_ss, -sum_weight)
   
-  ensemble$model='Ensemble'
+  ensemble$model <- "Ensemble"
   return(ensemble)
 }
 
