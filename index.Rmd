@@ -2,39 +2,63 @@
 title: "Portal Forecast"
 ---
 
-Welcome to Portal Forecasting! This is a website run by the [Weecology](http://weecology.org/) group, a group of interdisciplinary ecologists at the [University of Florida](http://www.wec.ufl.edu/). On this website, you'll find information about our ongoing efforts to forecast ecological systems from time series. Specifically, we are using a times series of rodent abundances from [The Portal project](http://portal.weecology.org/), a long-term experimental monitoring project in desert ecology. Enjoy! 
+Welcome to Portal Forecasting! This is a website run by the 
+[Weecology](http://weecology.org/) group, a group of interdisciplinary 
+ecologists at the [University of Florida](http://www.wec.ufl.edu/). On this
+website, you'll find information about our ongoing efforts to forecast
+ecological systems from time series. Specifically, we are using a times
+series of rodent abundances from 
+[The Portal project](http://portal.weecology.org/), a long-term experimental
+monitoring project in desert ecology. Enjoy! 
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
-library(dplyr)
-library(portalr)
 source("tools/forecast_tools.R")
 source("tools/data_tools.R")
 ```
 
 ## Total Abundance Forecast
 
-This is the forecast for next month's sampling of rodents at Portal.
+This is the forecast for next month's sampling of rodents at Portal.  The 
+black line indicates the historic total rodent abundance. The blue line 
+indicates the forecasted amount over the next 12 months, along with 
+confidence intervals. This forecast is from the Ensemble model. 
 
 ```{r, echo=FALSE, message=FALSE, warning=FALSE}
-obs_data = portalr::abundance("repo", clean=FALSE, level='treatment', length="longterm") %>%
-  filter(treatment=="control")
-obs_data$total = rowSums(select(obs_data, -c(period, treatment)))
-new_moons = read.csv(text = RCurl::getURL("https://raw.githubusercontent.com/weecology/PortalData/master/Rodents/moon_dates.csv"))
+obs_data <- portalr::abundance("repo", clean = FALSE, level = "treatment", 
+                               length = "longterm") %>%
+            dplyr::filter(treatment=="control")
+obs_data$total <- rowSums(dplyr::select(obs_data, -c(period, treatment)))
+url_base <- "https://raw.githubusercontent.com/weecology/PortalData/master/"
+url_suff <- "Rodents/moon_dates.csv"
+url_full <- paste(url_base, url_suff, sep = "")
+data_text <- RCurl::getURL(url_full)
+new_moons <- read.csv(text = data_text)
 
-obs_data_newmoon = inner_join(obs_data, new_moons, by = c("period" = "period"))
-obs_data_newmoon$censusdate = as.Date(obs_data_newmoon$censusdate)
+joins <- c("period" = "period")
+obs_data_newmoon <- dplyr::inner_join(obs_data, new_moons, by = joins)
+obs_data_newmoon$censusdate <- as.Date(obs_data_newmoon$censusdate)
 
-for_data = compile_forecasts() %>%
-  dplyr::filter(level == 'Controls', model == 'Ensemble', date == max(date))
+for_data <- compile_forecasts() %>%
+            dplyr::filter(level == "Controls", model == "Ensemble", 
+                          date == max(date))
 
-most_recent_forecast = max(for_data$date)
-for_data = filter(for_data, date == most_recent_forecast)
+most_recent_forecast <- max(for_data$date)
+for_data <- dplyr::filter(for_data, date == most_recent_forecast)
 
-for_data$model = "ensemble"
+for_data$model <- "ensemble"
 # get dates for future new moons for plotting
-future_moons = get_moon_data() %>% get_future_moons() %>% select(c("newmoonnumber","newmoondate"))
-for_data = inner_join(for_data, future_moons, by = c("newmoonnumber" = "newmoonnumber"))
+moon_data <- get_moon_data() 
+future_moons <- moon_data %>% 
+                portalr::get_future_moons() %>% 
+                dplyr::select(c("newmoonnumber", "newmoondate"))
+missings <- which(moon_data$newmoonnumber > unique(for_data$fit_end_newmoon))
+if(length(missings) > 0){
+  future_moons <- dplyr::bind_rows(moon_data[missings, ], future_moons)
+}
+
+joins <- c("newmoonnumber" = "newmoonnumber")
+for_data <- dplyr::inner_join(for_data, future_moons, by = joins)
 
 forecast_viz(obs_data = obs_data_newmoon,
              obs_date_col_name = "censusdate",
@@ -46,51 +70,66 @@ forecast_viz(obs_data = obs_data_newmoon,
              for_lowerpi_col_name = "LowerPI",
              for_upperpi_col_name = "UpperPI",
              start_newmoon = 300,
-             ylabel = 'Total Abundance')
+             ylabel = "Total Abundance")
 ```
 
 ## Species-Level Forecasts
+Point forecasts and 90% confidence intervals for specific species at the site
+for the next sampling period. 
 
 ```{r speciesforecasts, echo=FALSE, message=FALSE, warning=FALSE}
 source("tools/forecast_tools.R")
 
-data = compile_forecasts()
-ensemble = dplyr::filter(data, level == 'Controls', model == 'Ensemble', date == max(date))
-sp_predictions = get_sp_predicts(ensemble, 'Controls', 
-            lead_time = length(unique(ensemble$newmoonnumber)) - 11)
-sp_predict = plot_species_forecast(sp_predictions,
-            title=paste0(sp_predictions$forecast_date[2], ": Control plots"))
+data <- compile_forecasts()
+ensemble <- dplyr::filter(data, level == "Controls", model == "Ensemble",
+                         date == max(date))
+lead_time <- length(unique(ensemble$newmoonnumber)) - 11
+sp_predictions <- get_sp_predicts(ensemble, "Controls", 
+                                 lead_time = lead_time)
+plot_title <- paste0(sp_predictions$forecast_date[2], ": Control plots")
+sp_predict <- plot_species_forecast(sp_predictions, title = plot_title)
 
 plot(sp_predict)
 ```
 
 ## Most Abundant Species
 
+These figures are similar to the primary Total Abundance forecast above, but
+for the abundance of three common rodent species.
+
 ```{r highabund_ts_forecasts, echo=FALSE, message=FALSE, warning=FALSE}
-most_abund_sp = sp_predictions %>% 
-  filter(species != 'total') %>% 
-  arrange(desc(estimate)) %>% 
-  head(3) %>% 
-  select(species)
+most_abund_sp <- sp_predictions %>% 
+                 dplyr::filter(species != "total") %>% 
+                 dplyr::arrange(desc(estimate)) %>% 
+                 head(3) %>% 
+                 dplyr::select(species)
 
 # load in rodent species table to get scientific names to display on plots
-species_table = read.csv(
-  text = RCurl::getURL(
-      "https://raw.githubusercontent.com/weecology/PortalData/master/Rodents/Portal_rodent_species.csv"),stringsAsFactors = F,na.strings = '')
-most_abund_sp_names = filter(species_table,speciescode %in% most_abund_sp$species) %>% select(speciescode,scientificname)
+url_base <- "https://raw.githubusercontent.com/weecology/PortalData/master/"
+url_suff <- "Rodents/Portal_rodent_species.csv"
+url_full <- paste(url_base, url_suff, sep = "")
+text <- RCurl::getURL(url_full)
+species_table <- read.csv(text = text, stringsAsFactors = FALSE, 
+                          na.strings = "")
+most_abund_sp_names <- species_table %>% 
+                       dplyr::filter(speciescode %in%
+                                     most_abund_sp$species) %>% 
+                       dplyr::select(speciescode, scientificname)
 
-for (n in seq(dim(most_abund_sp_names)[1])) {
-  species_forecast = forecast_viz(obs_data = obs_data_newmoon,
-               obs_date_col_name = "censusdate",
-               obs_val_col_name = most_abund_sp_names$speciescode[n],
-               for_data = for_data,
-               for_date_col_name = "newmoondate",
-               for_val_col_name = "estimate",
-               for_model_name = "ensemble",
-               for_lowerpi_col_name = "LowerPI",
-               for_upperpi_col_name = "UpperPI",
-               start_newmoon = 300,
-               ylabel = most_abund_sp_names$scientificname[n])
+for (n in seq(dim(most_abund_sp_names)[1])){
+  ylab <- most_abund_sp_names$scientificname[n]
+  ov_colname <- most_abund_sp_names$speciescode[n]
+  species_forecast <- forecast_viz(obs_data = obs_data_newmoon,
+                                   obs_date_col_name = "censusdate",
+                                   obs_val_col_name = ov_colname,
+                                   for_data = for_data,
+                                   for_date_col_name = "newmoondate",
+                                   for_val_col_name = "estimate",
+                                   for_model_name = "ensemble",
+                                   for_lowerpi_col_name = "LowerPI",
+                                   for_upperpi_col_name = "UpperPI",
+                                   start_newmoon = 300,
+                                   ylabel = ylab)
   plot(species_forecast)
 }
 ```

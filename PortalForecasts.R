@@ -1,5 +1,8 @@
 source("tools/data_tools.R")
 source("tools/forecast_tools.R")
+"%>%" <- magrittr::"%>%"
+"!!" <- rlang::"!!"
+"!!!" <- rlang::"!!!"
 
 model_metadata <- yaml::yaml.load_file("data/model_metadata.yaml")
 forecast_date <- as.Date(model_metadata$forecast_date)
